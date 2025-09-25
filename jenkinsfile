@@ -6,6 +6,8 @@ pipeline {
         // ## Stage 1: Get the code
         stage('Checkout Code') {
             steps {
+                // Your GitHub URL has been added below.
+                // Make sure 'main' is the correct name for your branch.
                 git branch: 'main', url: 'https://github.com/galawaydude/api_a.git'
             }
         }
@@ -14,10 +16,9 @@ pipeline {
         stage('SonarQube Code Analysis') {
             steps {
                 script {
-                    withSonarQubeEnv('MySonarQubeServer') {
-                        def sqScanner = tool 'DefaultSonarScanner'
-                        sh "${sqScanner}/bin/sonar-scanner"
-                    }
+                    def sqScanner = tool 'DefaultSonarScanner'
+                    // Your token has been added to the command below
+                    sh "${sqScanner}/bin/sonar-scanner -Dsonar.login=squ_1f323da6b3d5d73c0dac682fac096ef7c85f7213"
                 }
             }
         }
