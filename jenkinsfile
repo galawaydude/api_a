@@ -1,31 +1,76 @@
 // Jenkinsfile
 pipeline {
-    agent any // Run this pipeline on any available Jenkins agent
-
-    // Creates a dropdown menu on the "Build" page to select which API to test
-    parameters {
-        choice(name: 'LLM_BRANCH', choices: ['llm-a', 'llm-b'], description: 'Which LLM branch to test?')
-    }
+    // Run this pipeline on any available Jenkins agent
+    agent any
 
     stages {
+        // ## Stage 1: Get the code from your repository
         stage('Checkout Code') {
             steps {
-                // Clones the specific branch selected by the user
-                git branch: params.LLM_BRANCH, url: 'https://github.com/galawaydude/api_a.git'
+                // Clones your specific branch from GitHub.
+                // **Remember to change 'main' to your branch name!**
+                git branch: 'main', url: 'https://github.com/galawaydude/api_a.git'
             }
         }
 
+        // ## Stage 2: Analyze the code's quality with SonarQube
         stage('SonarQube Code Analysis') {
             steps {
-                // Connect to the SonarQube server you configured in Jenkins
+                // Connects to the SonarQube server you configured in Jenkins
                 withSonarQubeEnv('MySonarQubeServer') {
+                    // Runs the scanner tool. This requires the sonar-project.properties file.
                     sh 'sonar-scanner'
                 }
             }
         }
-        
-        // ... (The rest of the Jenkinsfile stages for build, test, etc.) ...
+
+        // ## Stage 3: Build the API into a Docker image
+        stage('Build API Docker Image') {
+            steps {
+                script {
+                    // Creates a unique Docker image tagged with the build number
+                    def dockerImage = docker.build("llm-api:${env.BUILD_NUMBER}")
+                }
+            }
+        }
+
+        // ## Stage 4: Run all tests against the live, running API
+        stage('Run Automated Tests') {
+            steps {
+                script {
+                    // Runs the Docker image in the background
+                    dockerImage.withRun { container ->
+                        // Gives the API a moment to start up before testing
+                        sh 'sleep 15'
+
+                        // Installs Newman and the HTML reporter tool
+                        sh 'npm install -g newman newman-reporter-htmlextra'
+
+                        // Runs your Postman tests and generates an HTML report file
+                        sh "newman run api_tests.postman_collection.json --reporters cli,htmlextra --reporter-htmlextra-export report.html"
+
+                        // Runs your JMeter tests and generates a results file
+                        // Note: Make sure you have a JMeter test plan named APIPerformanceTest.jmx in your repo
+                        sh "jmeter -n -t APIPerformanceTest.jmx -l performance-results.jtl"
+                    }
+                }
+            }
+        }
     }
-    
-    // ... (Post-build steps for reporting and cleanup) ...
+
+    // ## Post-Build Actions: This section runs after all stages are finished
+    post {
+        always {
+            // Publishes the HTML report from Newman to the Jenkins build page
+            publishHTML(target: [
+                reportDir: '.', reportFiles: 'report.html', reportName: 'Functional Test Report'
+            ])
+
+            // Publishes the JMeter results to generate performance trend graphs
+            perfReport glob: 'performance-results.jtl'
+
+            // Cleans up by removing the Docker image created during the build
+            sh "docker rmi llm-api:${env.BUILD_NUMBER}"
+        }
+    }
 }
