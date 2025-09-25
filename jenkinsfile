@@ -1,0 +1,31 @@
+// Jenkinsfile
+pipeline {
+    agent any // Run this pipeline on any available Jenkins agent
+
+    // Creates a dropdown menu on the "Build" page to select which API to test
+    parameters {
+        choice(name: 'LLM_BRANCH', choices: ['llm-a', 'llm-b'], description: 'Which LLM branch to test?')
+    }
+
+    stages {
+        stage('Checkout Code') {
+            steps {
+                // Clones the specific branch selected by the user
+                git branch: params.LLM_BRANCH, url: 'https://github.com/galawaydude/api_a.git'
+            }
+        }
+
+        stage('SonarQube Code Analysis') {
+            steps {
+                // Connect to the SonarQube server you configured in Jenkins
+                withSonarQubeEnv('MySonarQubeServer') {
+                    sh 'sonar-scanner'
+                }
+            }
+        }
+        
+        // ... (The rest of the Jenkinsfile stages for build, test, etc.) ...
+    }
+    
+    // ... (Post-build steps for reporting and cleanup) ...
+}
