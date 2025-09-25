@@ -6,7 +6,7 @@ pipeline {
         // ## Stage 1: Get the code
         stage('Checkout Code') {
             steps {
-                git branch: 'main', url: 'YOUR_GITHUB_REPO_URL_HERE'
+                git branch: 'main', url: 'https://github.com/galawaydude/api_a.git'
             }
         }
 
