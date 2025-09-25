@@ -15,8 +15,8 @@ pipeline {
             steps {
                 script {
                     def sqScanner = tool 'DefaultSonarScanner'
-                    // Corrected to use -Dsonar.token instead of -Dsonar.login
-                    sh "${sqScanner}/bin/sonar-scanner -Dsonar.host.url=http://sonarqube:9000 -Dsonar.token=squ_1f323da6b3d5d73c0dac682fac096ef7c85f7213"
+                    // Corrected to use -Dsonar.token with your new token
+                    sh "${sqScanner}/bin/sonar-scanner -Dsonar.host.url=http://sonarqube:9000 -Dsonar.token=squ_f5405d34150ffcbd550e58871007da020a2d7b9b"
                 }
             }
         }
