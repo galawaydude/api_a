@@ -10,15 +10,15 @@ pipeline {
             }
         }
 
-        // ## Stage 2: Analyze code quality (Updated)
+        // ## Stage 2: Analyze code quality (Corrected)
         stage('SonarQube Code Analysis') {
             steps {
-                withSonarQubeEnv('MySonarQubeServer') {
-                    // This line finds the path to the scanner tool you configured
-                    def sqScanner = tool 'DefaultSonarScanner'
-                    
-                    // This line executes the scanner using its full path
-                    sh "${sqScanner}/bin/sonar-scanner"
+                // The logic is now wrapped in a 'script' block
+                script {
+                    withSonarQubeEnv('MySonarQubeServer') {
+                        def sqScanner = tool 'DefaultSonarScanner'
+                        sh "${sqScanner}/bin/sonar-scanner"
+                    }
                 }
             }
         }
