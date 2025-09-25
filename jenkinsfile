@@ -30,7 +30,7 @@ pipeline {
                     dockerImage.withRun { container ->
                         sh 'sleep 15'
                         sh 'npm install -g newman'
-                        sh "newman run api_tests.postman_collection.json"
+                        sh "newman run api_test.postman_collection.json"
                     }
                 }
             }
