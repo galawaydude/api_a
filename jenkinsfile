@@ -1,62 +1,64 @@
 // Jenkinsfile
 pipeline {
-    agent any
+    // This tells Jenkins to run the pipeline inside a Docker container
+    // that has all the necessary tools installed.
+    // The 'args' line gives this container access to your computer's Docker daemon.
+    agent {
+        docker {
+            image 'docker:20.10.17' // Using a specific, stable version
+            args '-v /var/run/docker.sock:/var/run/docker.sock'
+        }
+    }
 
     stages {
         // ## Stage 1: Get the code
         stage('Checkout Code') {
             steps {
-                git branch: 'main', url: 'https://github.com/galawaydude/api_a.git'
+                // This syncs the code from your GitHub repo into our Docker agent.
+                checkout scm
             }
         }
 
-        // ## Stage 2: Analyze code quality (Corrected)
+        // ## Stage 2: Analyze code quality
         stage('SonarQube Code Analysis') {
             steps {
-                // The logic is now wrapped in a 'script' block
-                script {
-                    withSonarQubeEnv('MySonarQubeServer') {
-                        def sqScanner = tool 'DefaultSonarScanner'
-                        sh "${sqScanner}/bin/sonar-scanner"
-                    }
-                }
+                // Runs the scanner with the URL and your authentication token.
+                sh "sonar-scanner -Dsonar.host.url=http://sonarqube:9000 -Dsonar.login=squ_1f323da6b3d5d73c0dac682fac096ef7c85f7213"
             }
         }
 
-        // ## Stage 3: Build the API into a Docker image
-        stage('Build API Docker Image') {
+        // ## Stage 3: Build and Test the API
+        stage('Build and Test') {
             steps {
                 script {
+                    // Build the API image using the Dockerfile in your repo
                     def dockerImage = docker.build("llm-api:${env.BUILD_NUMBER}")
-                }
-            }
-        }
 
-        // ## Stage 4: Run all tests
-        stage('Run Automated Tests') {
-            steps {
-                script {
+                    // Run the API container in the background
                     dockerImage.withRun { container ->
+                        // Give the API a moment to start up
                         sh 'sleep 15'
-                        sh 'npm install -g newman newman-reporter-htmlextra'
-                        sh "newman run api_tests.postman_collection.json --reporters cli,htmlextra --reporter-htmlextra-export report.html"
-                        // You can add your JMeter line back in once this is all working
-                        // sh "jmeter -n -t APIPerformanceTest.jmx -l performance-results.jtl"
+                        
+                        // Run the Newman functional tests
+                        sh "newman run api_tests.postman_collection.json"
                     }
                 }
             }
         }
     }
-
-    // ## Post-Build Actions
+    
+    // ## Post-Build Actions: This runs after all stages
     post {
         always {
-            publishHTML(target: [
-                reportDir: '.', reportFiles: 'report.html', reportName: 'Functional Test Report'
-            ])
-            // You can add the perfReport line back in later
-            // perfReport glob: 'performance-results.jtl'
-            sh "docker rmi llm-api:${env.BUILD_NUMBER}"
+            // Cleans up by removing the Docker image created during the build
+            script {
+                // Using a try-catch block to prevent an error if the image doesn't exist
+                try {
+                    docker.image("llm-api:${env.BUILD_NUMBER}").remove()
+                } catch (e) {
+                    echo "Could not remove Docker image; it may not have been built successfully."
+                }
+            }
         }
     }
 }
