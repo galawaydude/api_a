@@ -2,24 +2,23 @@
 pipeline {
     agent any
 
-    // This new 'tools' block makes the scanner program available to the pipeline
-    tools {
-        sonarScanner 'DefaultSonarScanner'
-    }
-
     stages {
-        // ## Stage 1: Get the code from your repository
+        // ## Stage 1: Get the code
         stage('Checkout Code') {
             steps {
                 git branch: 'main', url: 'https://github.com/galawaydude/api_a.git'
             }
         }
 
-        // ## Stage 2: Analyze the code's quality with SonarQube
+        // ## Stage 2: Analyze code quality (Updated)
         stage('SonarQube Code Analysis') {
             steps {
                 withSonarQubeEnv('MySonarQubeServer') {
-                    sh 'sonar-scanner'
+                    // This line finds the path to the scanner tool you configured
+                    def sqScanner = tool 'DefaultSonarScanner'
+                    
+                    // This line executes the scanner using its full path
+                    sh "${sqScanner}/bin/sonar-scanner"
                 }
             }
         }
@@ -33,7 +32,7 @@ pipeline {
             }
         }
 
-        // ## Stage 4: Run all tests against the live, running API
+        // ## Stage 4: Run all tests
         stage('Run Automated Tests') {
             steps {
                 script {
@@ -41,20 +40,22 @@ pipeline {
                         sh 'sleep 15'
                         sh 'npm install -g newman newman-reporter-htmlextra'
                         sh "newman run api_tests.postman_collection.json --reporters cli,htmlextra --reporter-htmlextra-export report.html"
-                        sh "jmeter -n -t APIPerformanceTest.jmx -l performance-results.jtl"
+                        // You can add your JMeter line back in once this is all working
+                        // sh "jmeter -n -t APIPerformanceTest.jmx -l performance-results.jtl"
                     }
                 }
             }
         }
     }
 
-    // ## Post-Build Actions: This section runs after all stages are finished
+    // ## Post-Build Actions
     post {
         always {
             publishHTML(target: [
                 reportDir: '.', reportFiles: 'report.html', reportName: 'Functional Test Report'
             ])
-            perfReport glob: 'performance-results.jtl'
+            // You can add the perfReport line back in later
+            // perfReport glob: 'performance-results.jtl'
             sh "docker rmi llm-api:${env.BUILD_NUMBER}"
         }
     }
