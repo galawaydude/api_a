@@ -6,7 +6,6 @@ pipeline {
         // ## Stage 1: Get the code
         stage('Checkout Code') {
             steps {
-                // Your GitHub URL has been added below.
                 git branch: 'main', url: 'https://github.com/galawaydude/api_a.git'
             }
         }
@@ -16,7 +15,7 @@ pipeline {
             steps {
                 script {
                     def sqScanner = tool 'DefaultSonarScanner'
-                    // The host URL is now specified to point to your local server
+                    // The host URL and your token are now both specified
                     sh "${sqScanner}/bin/sonar-scanner -Dsonar.host.url=http://sonarqube:9000 -Dsonar.login=squ_1f323da6b3d5d73c0dac682fac096ef7c85f7213"
                 }
             }
