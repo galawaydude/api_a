@@ -1,39 +1,58 @@
-// Jenkinsfile
 pipeline {
     agent any
 
+    environment {
+        // Assumes SonarQube is running on localhost. Change if different.
+        SONARQUBE_URL = "http://localhost:9000" 
+        // Name of the SonarQube credential configured in Jenkins
+        SONARQUBE_AUTH_TOKEN = "sonarqube-token" 
+    }
+
     stages {
-        // ## Stage 1: Get the code
-        stage('Checkout Code') {
+        stage('Checkout') {
             steps {
+                // Checkout the code from your repository
                 git branch: 'main', url: 'https://github.com/galawaydude/api_a.git'
             }
         }
 
-        // ## Stage 2: Analyze code quality
-        stage('SonarQube Code Analysis') {
+        stage('Build Docker Image') {
             steps {
                 script {
-                    def sqScanner = tool 'DefaultSonarScanner'
-                    // Corrected to use -Dsonar.token with your new token
-                    sh "${sqScanner}/bin/sonar-scanner -Dsonar.host.url=http://sonarqube:9000 -Dsonar.token=squ_f5405d34150ffcbd550e58871007da020a2d7b9b"
+                    echo "Building Docker image..."
+                    def dockerImage = docker.build("blog-api:${env.BUILD_ID}", ".")
+                    echo "Docker image built: ${dockerImage.id}"
                 }
             }
         }
 
-        // ## Stage 3: Build and Test the API
-        stage('Build and Test') {
+        stage('SonarQube Analysis') {
             steps {
                 script {
-                    def dockerImage = docker.build("llm-api:${env.BUILD_NUMBER}")
-
-                    dockerImage.withRun { container ->
-                        sh 'sleep 15'
-                        sh 'npm install -g newman'
-                        sh "newman run api_test.postman_collection.json"
+                    // Requires SonarQube Scanner for Jenkins plugin
+                    // and a SonarQube server instance running.
+                    def scannerHome = tool 'SonarQubeScanner'
+                    withSonarQubeEnv('SonarQube') {
+                        sh "${scannerHome}/bin/sonar-scanner"
                     }
                 }
             }
+        }
+
+        stage('Quality Gate') {
+            steps {
+                // Waits for SonarQube to complete the analysis and checks the Quality Gate status.
+                // Fails the pipeline if the Quality Gate is not 'OK'.
+                timeout(time: 1, unit: 'HOURS') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            echo 'Pipeline finished.'
         }
     }
 }
