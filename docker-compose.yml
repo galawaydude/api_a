@@ -1,17 +1,35 @@
-version: "3.9" # Use the latest stable compose spec
+version: '3.8'
 
 services:
-  api:
-    build: .
-    container_name: blog-api
+  jenkins:
+    image: jenkins/jenkins:lts
+    container_name: jenkins
+    user: root
     ports:
-      - "8000:8000"
+      - "8080:8080"
+      - "50000:50000"
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:15
+    container_name: postgres
+    environment:
+      POSTGRES_USER: sonar
+      POSTGRES_PASSWORD: sonar
+      POSTGRES_DB: sonar
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
     networks:
       - app-network
     restart: unless-stopped
 
   sonarqube:
-    image: sonarqube:10.7.0-community # latest stable community edition
+    image: sonarqube:lts-community   # always pulls the latest stable LTS
     container_name: sonarqube
     depends_on:
       - postgres
@@ -30,42 +48,13 @@ services:
       - app-network
     restart: unless-stopped
 
-  postgres:
-    image: postgres:15-alpine
-    container_name: sonarqube-db
-    environment:
-      POSTGRES_USER: sonar
-      POSTGRES_PASSWORD: sonar
-      POSTGRES_DB: sonar
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - app-network
-    restart: unless-stopped
-
-  jenkins:
-    image: jenkins/jenkins:lts-jdk17 # latest LTS with Java 17
-    container_name: jenkins
-    user: root
-    ports:
-      - "8080:8080"
-      - "50000:50000"
-    environment:
-      JAVA_OPTS: -Djenkins.install.runSetupWizard=false
-    volumes:
-      - jenkins_home:/var/jenkins_home
-      - /var/run/docker.sock:/var/run/docker.sock # Allow Jenkins to use the host's Docker daemon
-    networks:
-      - app-network
-    restart: unless-stopped
-
 networks:
   app-network:
     driver: bridge
 
 volumes:
   jenkins_home:
+  postgres_data:
   sonarqube_data:
   sonarqube_extensions:
   sonarqube_logs:
-  postgres_data:
