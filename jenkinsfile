@@ -1,9 +1,16 @@
 pipeline {
-    agent any
+    // 1. Define a Docker agent with the Sonar Scanner.
+    // We run as 'root' to install Python.
+    agent {
+        docker {
+            image 'sonarsource/sonar-scanner-cli:latest'
+            args '-u root'
+        }
+    }
 
     environment {
-        SONARQUBE = 'SonarQube'   // Name configured in Jenkins
-        SONAR_AUTH_TOKEN = credentials('sonar-token') // Jenkins secret
+        // Define an alias for python3 and add venv to the PATH
+        PATH = "${env.WORKSPACE}/venv/bin:${env.PATH}"
     }
 
     stages {
@@ -15,29 +22,34 @@ pipeline {
 
         stage('Install Dependencies') {
             steps {
+                // 2. Install Python and create the virtual environment.
+                // The sonar-scanner image is Alpine-based, so we use 'apk'.
+                sh 'apk add --no-cache python3 py3-pip'
                 sh 'python3 -m venv venv'
-                sh '. venv/bin/activate && pip install --upgrade pip'
-                sh '. venv/bin/activate && pip install -r requirements.txt'
+                sh 'pip install --upgrade pip'
+                sh 'pip install -r requirements.txt'
             }
         }
 
         stage('SonarQube Analysis') {
             steps {
-                withSonarQubeEnv('SonarQube') {
-                    sh """
-                        sonar-scanner \
-                          -Dsonar.projectKey=blog-api \
-                          -Dsonar.sources=. \
-                          -Dsonar.host.url=http://sonarqube:9000 \
-                          -Dsonar.login=$SONAR_AUTH_TOKEN
-                    """
-                }
+                // withSonarQubeEnv is not needed when using the scanner CLI directly
+                // 3. Run the Sonar Scanner. It's already in the Docker image's PATH.
+                // Note: Use your Jenkins secret credential ID for the token.
+                sh """
+                    sonar-scanner \
+                      -Dsonar.projectKey=blog-api \
+                      -Dsonar.sources=. \
+                      -Dsonar.host.url=http://sonarqube:9000 \
+                      -Dsonar.login=${credentials('sonar-token')}
+                """
             }
         }
 
         stage('Quality Gate') {
             steps {
                 timeout(time: 2, unit: 'MINUTES') {
+                    // Use the correct server name from your Jenkins configuration
                     waitForQualityGate abortPipeline: true
                 }
             }
@@ -50,4 +62,3 @@ pipeline {
         }
     }
 }
-    
