@@ -2,38 +2,35 @@ pipeline {
     agent any
 
     environment {
-        SONARQUBE = 'SonarQube'   // Name from Jenkins config
+        SONARQUBE = 'SonarQube'   // Name configured in Jenkins
+        SONAR_AUTH_TOKEN = credentials('sonar-token') // Jenkins secret
     }
 
     stages {
         stage('Checkout') {
             steps {
-                git branch: 'main', url: 'https://github.com/galawaydude/api_a.git'
+                git url: 'https://github.com/galawaydude/api_a.git', branch: 'main'
             }
         }
 
-        stage('Build Docker Image') {
+        stage('Install Dependencies') {
             steps {
-                script {
-                    echo "Building Docker image..."
-                    docker.build("blog-api:${env.BUILD_ID}", ".")
-                }
+                sh 'python3 -m venv venv'
+                sh '. venv/bin/activate && pip install --upgrade pip'
+                sh '. venv/bin/activate && pip install -r requirements.txt'
             }
         }
 
         stage('SonarQube Analysis') {
             steps {
-                script {
-                    def scannerHome = tool 'SonarQubeScanner'
-                    withSonarQubeEnv("${SONARQUBE}") {
-                        sh """
-                          ${scannerHome}/bin/sonar-scanner \
-                            -Dsonar.projectKey=blog-api \
-                            -Dsonar.sources=./app \
-                            -Dsonar.host.url=http://sonarqube:9000 \
-                            -Dsonar.login=$SONAR_AUTH_TOKEN
-                        """
-                    }
+                withSonarQubeEnv('SonarQube') {
+                    sh """
+                        sonar-scanner \
+                          -Dsonar.projectKey=blog-api \
+                          -Dsonar.sources=. \
+                          -Dsonar.host.url=http://sonarqube:9000 \
+                          -Dsonar.login=$SONAR_AUTH_TOKEN
+                    """
                 }
             }
         }
@@ -53,3 +50,4 @@ pipeline {
         }
     }
 }
+    
