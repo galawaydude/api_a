@@ -2,16 +2,12 @@ pipeline {
     agent any
 
     environment {
-        // Assumes SonarQube is running on localhost. Change if different.
-        SONARQUBE_URL = "http://localhost:9000" 
-        // Name of the SonarQube credential configured in Jenkins
-        SONARQUBE_AUTH_TOKEN = "sonarqube-token" 
+        SONARQUBE = 'SonarQube'   // Name from Jenkins config
     }
 
     stages {
         stage('Checkout') {
             steps {
-                // Checkout the code from your repository
                 git branch: 'main', url: 'https://github.com/galawaydude/api_a.git'
             }
         }
@@ -20,8 +16,7 @@ pipeline {
             steps {
                 script {
                     echo "Building Docker image..."
-                    def dockerImage = docker.build("blog-api:${env.BUILD_ID}", ".")
-                    echo "Docker image built: ${dockerImage.id}"
+                    docker.build("blog-api:${env.BUILD_ID}", ".")
                 }
             }
         }
@@ -29,11 +24,15 @@ pipeline {
         stage('SonarQube Analysis') {
             steps {
                 script {
-                    // Requires SonarQube Scanner for Jenkins plugin
-                    // and a SonarQube server instance running.
                     def scannerHome = tool 'SonarQubeScanner'
-                    withSonarQubeEnv('SonarQube') {
-                        sh "${scannerHome}/bin/sonar-scanner"
+                    withSonarQubeEnv("${SONARQUBE}") {
+                        sh """
+                          ${scannerHome}/bin/sonar-scanner \
+                            -Dsonar.projectKey=blog-api \
+                            -Dsonar.sources=./app \
+                            -Dsonar.host.url=http://sonarqube:9000 \
+                            -Dsonar.login=$SONAR_AUTH_TOKEN
+                        """
                     }
                 }
             }
@@ -41,9 +40,7 @@ pipeline {
 
         stage('Quality Gate') {
             steps {
-                // Waits for SonarQube to complete the analysis and checks the Quality Gate status.
-                // Fails the pipeline if the Quality Gate is not 'OK'.
-                timeout(time: 1, unit: 'HOURS') {
+                timeout(time: 2, unit: 'MINUTES') {
                     waitForQualityGate abortPipeline: true
                 }
             }
